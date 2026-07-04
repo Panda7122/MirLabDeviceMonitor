@@ -21,6 +21,8 @@ def _read_json(path: str, default):
 
 def _write_json(path: str, data) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if not os.path.exists(path):
+        open(path, "a", encoding="utf-8").close()
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
