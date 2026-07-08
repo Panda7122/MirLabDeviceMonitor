@@ -19,7 +19,7 @@ HELP_TEXT = (
     "`/monitor show_device_list` — 顯示目前的 device list\n"
     "`/monitor add_filter username name` — 將 process name 加入該使用者的 filter list（顯示 pid 清單時會被隱藏）\n"
     "`/monitor remove_filter username name` — 從該使用者的 filter list 移除 process name\n"
-    "`/monitor show_pid_list device` — 顯示裝置上的 pid / process name / owner / command 清單（會套用 filter list）\n"
+    "`/monitor show_pid_list device [hide_system]` — 顯示裝置上的 pid / process name / owner / command 清單（會套用 filter list；hide_system 預設為 True，可設 False 顯示 COMMAND 開頭為 / 的系統行程）\n"
     "`/monitor reminder device pid` — 監控裝置上的 pid，執行完畢時在本頻道 mention 你\n"
     "`/monitor help` — 顯示這份說明\n"
     "\n"
@@ -132,8 +132,8 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
     # ---- pid list ----
 
     @app_commands.command(name="show_pid_list", description="顯示裝置上的 pid / process name / owner / command 清單")
-    @app_commands.describe(device="裝置名稱")
-    async def show_pid_list(self, interaction: discord.Interaction, device: str):
+    @app_commands.describe(device="裝置名稱", hide_system="是否隱藏 COMMAND 開頭為 / 的系統行程（預設：是）")
+    async def show_pid_list(self, interaction: discord.Interaction, device: str, hide_system: bool = True):
         device_data = await storage.get_device(device)
         if device_data is None:
             await interaction.response.send_message(f"找不到裝置 `{device}`，請確認裝置名稱是否正確。", ephemeral=True)
@@ -146,14 +146,14 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         except ssh_utils.SSHCommandError as e:
             await interaction.followup.send(f"取得裝置 `{device}` 的 pid 清單失敗：{e}", ephemeral=True)
             return
-        # print(processes)
+
         users = await storage.load_users()
         filters = await storage.load_filters()
         processes = [
             p for p in processes
             if p["owner"] in users
             and p["name"] not in filters.get(p["owner"], [])
-            and not p["command"].startswith("/")
+            and (not hide_system or not p["command"].startswith("/"))
         ]
 
         if not processes:
