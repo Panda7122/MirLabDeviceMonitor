@@ -1,7 +1,7 @@
 # Lab Device Monitor Discord Bot
 
-A Discord bot for monitoring processes on lab machines over SSH — list who's
-running what on a device, hide noise you don't care about, and get pinged
+A Discord bot for monitoring processes on lab machines over SSH — list your
+own processes on a device, hide noise you don't care about, and get pinged
 when a specific process finishes.
 
 All commands are Discord **slash commands** under the `/monitor` group.
@@ -9,27 +9,34 @@ Every reply is ephemeral (only you can see it) except the "process finished"
 notification from `/monitor reminder`, which is posted publicly in the
 channel where it was started.
 
+Each Discord user registers their **own SSH login per device** with
+`add_user` — there's no shared/global SSH identity. `show_pid_list` and
+`reminder` log in as that registered user and only ever show that user's own
+processes, so different Discord users querying the same device only ever see
+their own stuff.
+
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| `/monitor add_user <username>` | Add a username to the user list |
-| `/monitor remove_user <username>` | Remove a username from the user list |
-| `/monitor show_user_list` | Show the current user list |
+| `/monitor add_user <device> <username> <password>` | Register your SSH login for a device (per Discord account, per device) |
+| `/monitor remove_user <device>` | Remove your registered login for a device |
+| `/monitor show_user_list` | Show the devices *you've* registered logins for (usernames only, never passwords) |
 | `/monitor add_device <name> <ip> <port>` | Add a device (SSH host + port) to the device list |
 | `/monitor remove_device <name>` | Remove a device from the device list |
 | `/monitor show_device_list` | Show the current device list |
 | `/monitor add_filter <username> <name>` | Hide a process name from that user's `show_pid_list` output |
 | `/monitor remove_filter <username> <name>` | Un-hide a previously filtered process name |
-| `/monitor show_pid_list <device>` | List pid / owner / process name / full command for a device |
-| `/monitor reminder <device> <pid>` | Get pinged in this channel when that pid finishes |
+| `/monitor show_pid_list <device> [hide_system]` | Log in with your registered credentials and list your pid / process name / command on that device |
+| `/monitor reminder <device> <pid>` | Log in with your registered credentials and get pinged in this channel when that pid finishes |
 | `/monitor help` | Show this command list in Discord |
 
-`show_pid_list` only shows processes whose owner is in the user list, whose
-name isn't in that owner's filter list, and whose command doesn't start with
-`/` (which filters out system daemons that show as an absolute path, leaving
-user-run commands like `python3 train.py`). Long results are paginated with
-⬅️/➡️ buttons.
+`show_pid_list` and `reminder` both require you to have run `add_user` for
+that device first. `show_pid_list` shows only processes owned by your
+registered username, minus anything in that username's filter list, and
+(unless `hide_system:False`) minus processes whose command starts with `/`
+(system daemons — leaves user-run commands like `python3 train.py`). Long
+results are paginated with ⬅️/➡️ buttons.
 
 ## Setup
 
@@ -44,8 +51,6 @@ user-run commands like `python3 train.py`). Long results are paginated with
    - `GUILD_ID` — optional; set this to your server's ID while developing so
      slash commands sync instantly (a few seconds) instead of globally
      (which can take up to an hour to show up)
-   - `SSH_DEFAULT_USER` / `SSH_DEFAULT_KEY_PATH` / `SSH_DEFAULT_PASSWORD` —
-     one SSH identity used for every device (key auth recommended)
 3. In the Discord Developer Portal, make sure the bot's invite URL includes
    the `applications.commands` scope (required for slash commands), then
    invite it to your server.
@@ -57,19 +62,26 @@ user-run commands like `python3 train.py`). Long results are paginated with
 ## Requirements on each monitored device
 
 - SSH access reachable at the `ip`/`port` you register with `add_device`,
-  using the single identity configured in `.env`.
+  using whatever username/password each Discord user registers for
+  themselves with `add_user`.
 - `bash` available on the device (used for `mapfile` when reading
   `/proc/<pid>/cmdline` without forking a subprocess per process — this is
   what keeps `show_pid_list` fast even with hundreds of running processes).
-- Reading another user's `/proc/<pid>/cmdline` requires either being that
-  user or root; if the SSH identity is an unprivileged user, `show_pid_list`
-  will only be able to show full commands for that user's own processes.
+
+## Security note
+
+`add_user` passwords are stored **in plaintext** in `data/users.json` (not
+committed — see `.gitignore`) so the bot can re-authenticate on your behalf
+for `show_pid_list`/`reminder`. Treat that file, and the machine the bot
+runs on, as sensitive. This is meant for a trusted internal lab setting, not
+a public server.
 
 ## Data files
 
-Everything is plain JSON under `data/`, read/written directly (no database):
+Everything is plain JSON under `data/`, read/written directly (no database),
+and gitignored:
 
-- `data/users.json` — `list[str]` of usernames
+- `data/users.json` — `dict[discord_user_id, dict[device_name, {"username", "password"}]]`
 - `data/devices.json` — `list[{"name", "ip", "port"}]`
 - `data/filters.json` — `dict[username, list[process_name]]`
 

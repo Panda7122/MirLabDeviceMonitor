@@ -27,38 +27,54 @@ def _write_json(path: str, data) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# ---- users.json: list[str] ----
+# ---- users.json: dict[dc_id, dict[device, {"username", "password"}]] ----
+# per-(Discord user, device) SSH login used to query only that person's own
+# processes on that device, instead of one shared identity for everyone.
 
-async def load_users() -> list[str]:
+async def get_user_credential(dc_id: str, device: str) -> dict | None:
     async with _users_lock:
-        return _read_json(config.USERS_FILE, [])
+        users = _read_json(config.USERS_FILE, {})
+        return users.get(dc_id, {}).get(device)
 
 
-async def add_user(username: str) -> bool:
-    """Returns False if the user already exists."""
+async def list_user_credentials(dc_id: str) -> dict[str, dict]:
+    """Returns {device: {"username": str}} for this Discord user (no passwords)."""
     async with _users_lock:
-        users = _read_json(config.USERS_FILE, [])
-        if username in users:
-            return False
-        users.append(username)
+        users = _read_json(config.USERS_FILE, {})
+        return {
+            device: {"username": cred["username"]}
+            for device, cred in users.get(dc_id, {}).items()
+        }
+
+
+async def set_user_credential(dc_id: str, device: str, username: str, password: str) -> bool:
+    """Returns True if this is a new registration, False if it overwrote an existing one."""
+    async with _users_lock:
+        users = _read_json(config.USERS_FILE, {})
+        devices = users.setdefault(dc_id, {})
+        is_new = device not in devices
+        devices[device] = {"username": username, "password": password}
         _write_json(config.USERS_FILE, users)
-        return True
+        return is_new
 
 
-async def remove_user(username: str) -> bool:
-    """Returns False if the user was not found."""
+async def remove_user_credential(dc_id: str, device: str) -> bool:
+    """Returns False if there was no registration for this (dc_id, device)."""
     async with _users_lock:
-        users = _read_json(config.USERS_FILE, [])
-        if username not in users:
+        users = _read_json(config.USERS_FILE, {})
+        devices = users.get(dc_id, {})
+        if device not in devices:
             return False
-        users.remove(username)
+        del devices[device]
+        if not devices:
+            users.pop(dc_id, None)
         _write_json(config.USERS_FILE, users)
         return True
 
 
 # ---- devices.json: list[dict] ----
 # each device: {"name": str, "ip": str, "port": int}
-# SSH credentials are not stored per-device; see SSH_DEFAULT_* in config.py
+# SSH credentials are not stored here — see users.json, keyed per (Discord user, device)
 
 async def load_devices() -> list[dict]:
     async with _devices_lock:

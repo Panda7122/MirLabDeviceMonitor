@@ -10,16 +10,15 @@ class SSHCommandError(Exception):
     """Raised when connecting to or running a command on a device fails."""
 
 
-def _run_command_raw_sync(device: dict, command: str) -> tuple[int, str, str]:
+def _run_command_raw_sync(device: dict, username: str, password: str, command: str) -> tuple[int, str, str]:
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         client.connect(
             hostname=device["ip"],
             port=int(device["port"]),
-            username=config.SSH_DEFAULT_USER,
-            password=config.SSH_DEFAULT_PASSWORD,
-            key_filename=config.SSH_DEFAULT_KEY_PATH,
+            username=username,
+            password=password,
             timeout=config.SSH_TIMEOUT_SECONDS,
             banner_timeout=config.SSH_TIMEOUT_SECONDS,
             auth_timeout=config.SSH_TIMEOUT_SECONDS,
@@ -30,14 +29,14 @@ def _run_command_raw_sync(device: dict, command: str) -> tuple[int, str, str]:
         exit_status = stdout.channel.recv_exit_status()
         return exit_status, out, err
     except paramiko.AuthenticationException as e:
-        raise SSHCommandError(f"SSH 認證失敗: {e}") from e
+        raise SSHCommandError(f"SSH 認證失敗（使用者 {username}）: {e}") from e
     except (paramiko.SSHException, OSError) as e:
         raise SSHCommandError(f"無法連線到裝置 {device.get('name', device.get('ip'))}: {e}") from e
     finally:
         client.close()
 
 
-async def run_command_raw(device: dict, command: str) -> tuple[int, str, str]:
+async def run_command_raw(device: dict, username: str, password: str, command: str) -> tuple[int, str, str]:
     # asyncio.wait_for only stops *waiting*: paramiko's blocking calls run in a
     # real OS thread that can't be killed from here. On timeout that thread
     # keeps running until its own per-op SSH_TIMEOUT_SECONDS eventually unblocks
@@ -45,7 +44,7 @@ async def run_command_raw(device: dict, command: str) -> tuple[int, str, str]:
     # hanging until then.
     try:
         return await asyncio.wait_for(
-            asyncio.to_thread(_run_command_raw_sync, device, command),
+            asyncio.to_thread(_run_command_raw_sync, device, username, password, command),
             timeout=config.SSH_TOTAL_TIMEOUT_SECONDS,
         )
     except asyncio.TimeoutError as e:
@@ -55,8 +54,8 @@ async def run_command_raw(device: dict, command: str) -> tuple[int, str, str]:
         ) from e
 
 
-async def run_command(device: dict, command: str) -> str:
-    exit_status, out, err = await run_command_raw(device, command)
+async def run_command(device: dict, username: str, password: str, command: str) -> str:
+    exit_status, out, err = await run_command_raw(device, username, password, command)
     if exit_status != 0 and not out.strip():
         raise SSHCommandError(f"指令執行失敗 (exit {exit_status}): {err.strip() or command}")
     return out
@@ -88,9 +87,11 @@ _PROCESS_LIST_LOOP = (
 _PROCESS_LIST_SCRIPT = f"ps -eo pid=,user:32=,comm=\necho '{_CMD_MARKER}'\n{_PROCESS_LIST_LOOP}"
 
 
-async def get_process_list(device: dict) -> list[dict]:
+async def get_process_list(device: dict, username: str, password: str) -> list[dict]:
     """Returns a list of {"pid": int, "name": str, "owner": str, "command": str}."""
-    output = await run_command(device, f"bash -c {shlex.quote(_PROCESS_LIST_SCRIPT)}")
+    output = await run_command(
+        device, username, password, f"bash -c {shlex.quote(_PROCESS_LIST_SCRIPT)}"
+    )
     ps_part, _marker, cmd_part = output.partition(_CMD_MARKER)
 
     processes = []
@@ -120,6 +121,8 @@ async def get_process_list(device: dict) -> list[dict]:
     return processes
 
 
-async def is_pid_alive(device: dict, pid: int) -> bool:
-    _exit_status, out, _err = await run_command_raw(device, f"ps -p {shlex.quote(str(pid))} -o pid=")
+async def is_pid_alive(device: dict, username: str, password: str, pid: int) -> bool:
+    _exit_status, out, _err = await run_command_raw(
+        device, username, password, f"ps -p {shlex.quote(str(pid))} -o pid="
+    )
     return out.strip() != ""

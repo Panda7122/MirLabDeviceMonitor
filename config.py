@@ -12,10 +12,6 @@ COMMAND_PREFIX = os.getenv("COMMAND_PREFIX", "!")  # unused now that commands ar
 # hour to show up everywhere.
 GUILD_ID = int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None
 
-SSH_DEFAULT_USER = os.getenv("SSH_DEFAULT_USER", "")
-SSH_DEFAULT_KEY_PATH = os.getenv("SSH_DEFAULT_KEY_PATH", "") or None
-SSH_DEFAULT_PASSWORD = os.getenv("SSH_DEFAULT_PASSWORD", "") or None
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
