@@ -126,3 +126,15 @@ async def is_pid_alive(device: dict, username: str, password: str, pid: int) -> 
         device, username, password, f"ps -p {shlex.quote(str(pid))} -o pid="
     )
     return out.strip() != ""
+
+
+async def get_pid_command(device: dict, username: str, password: str, pid: int) -> str:
+    """Returns the full command line for a single pid (same source as get_process_list's
+    COMMAND column), or "" if it's already gone / unreadable."""
+    pid_path = shlex.quote(f"/proc/{pid}/cmdline")
+    script = (
+        f'mapfile -d "" -t args < {pid_path} 2>/dev/null; '
+        'printf "%s" "${args[*]}"'
+    )
+    output = await run_command(device, username, password, f"bash -c {shlex.quote(script)}")
+    return output.strip()

@@ -220,12 +220,19 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
             await interaction.followup.send(f"裝置 `{device}` 上找不到執行中的 pid `{pid}`。", ephemeral=True)
             return
 
+        try:
+            command = await ssh_utils.get_pid_command(device_data, username, password, pid)
+        except ssh_utils.SSHCommandError:
+            command = ""
+        command_suffix = f"（`{command}`）" if command else ""
+
         await interaction.followup.send(
-            f"開始監控裝置 `{device}` 的 pid `{pid}`，執行完畢時會在此頻道通知你。", ephemeral=True
+            f"開始監控裝置 `{device}` 的 pid `{pid}`{command_suffix}，執行完畢時會在此頻道通知你。", ephemeral=True
         )
         task = self.bot.loop.create_task(
             self._watch_pid(
-                interaction.channel, interaction.user, device, device_data, username, password, pid, key
+                interaction.channel, interaction.user, device, device_data,
+                username, password, pid, command, key,
             )
         )
         self.active_reminders[key] = task
@@ -239,8 +246,10 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         username: str,
         password: str,
         pid: int,
+        command: str,
         key: tuple[str, int],
     ):
+        command_suffix = f"（`{command}`）" if command else ""
         try:
             while True:
                 await asyncio.sleep(config.PID_POLL_INTERVAL_SECONDS)
@@ -248,12 +257,12 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
                     alive = await ssh_utils.is_pid_alive(device_data, username, password, pid)
                 except ssh_utils.SSHCommandError as e:
                     await channel.send(
-                        f"監控裝置 `{device_name}` 的 pid `{pid}` 時發生錯誤，已停止監控：{e}"
+                        f"監控裝置 `{device_name}` 的 pid `{pid}`{command_suffix} 時發生錯誤，已停止監控：{e}"
                     )
                     return
                 if not alive:
                     await channel.send(
-                        f"{author.mention} 裝置 `{device_name}` 的 pid `{pid}` 已執行完畢。"
+                        f"{author.mention} 裝置 `{device_name}` 的 pid `{pid}`{command_suffix} 已執行完畢。"
                     )
                     return
         except asyncio.CancelledError:
