@@ -12,9 +12,10 @@ LANGUAGE_NAMES = {
     "chinese": "繁體中文",
     "english": "English",
     "japanese": "日本語",
-    "maid": "女僕風格 🎀",
-    "anime": "中二動漫風 🔥",
-    "mygo": "MyGO!!!!! 風格 🎸",
+    "maid": "女僕",
+    "anime": "動漫",
+    "mygo": "MyGO!!!!!",
+    "mesugaki": "雌小鬼",
 }
 
 _MESSAGES: dict[str, dict[str, str]] = {
@@ -61,7 +62,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "`/monitor remove_filter username name` — 從該使用者的 filter list 移除 process name\n"
             "`/monitor show_pid_list device [hide_system]` — 使用你在該裝置註冊的帳密登入，顯示你自己的 pid / process name / command 清單（hide_system 預設為 True，可設 False 顯示 COMMAND 開頭為 / 的系統行程）\n"
             "`/monitor reminder device pid` — 使用你在該裝置註冊的帳密監控 pid，執行完畢時在本頻道 mention 你\n"
-            "`/monitor language lang` — 設定你的顯示語言（繁體中文 / English / 日本語）\n"
+            "`/monitor language lang` — 設定你的顯示語言（繁體中文 / English / 日本語 / 女僕 / 動漫 / MyGO!!!!! / 雌小鬼）\n"
             "`/monitor help` — 顯示這份說明\n"
             "\n"
             "`show_pid_list` 和 `reminder` 都需要先用 `add_user` 註冊該裝置的登入資訊。\n"
@@ -111,7 +112,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "`/monitor remove_filter username name` — Unhide a previously filtered process name\n"
             "`/monitor show_pid_list device [hide_system]` — Log in with your registered credentials and show your own pid / process name / command list (hide_system defaults to True; set False to also show commands starting with /)\n"
             "`/monitor reminder device pid` — Log in with your registered credentials and monitor a pid; you'll be mentioned in this channel when it finishes\n"
-            "`/monitor language lang` — Set your display language (Traditional Chinese / English / Japanese)\n"
+            "`/monitor language lang` — Set your display language (Traditional Chinese / English / Japanese / maid / anime / MyGO!!!!! / mesugaki)\n"
             "`/monitor help` — Show this help text\n"
             "\n"
             "`show_pid_list` and `reminder` both require you to register a login for that device with `add_user` first.\n"
@@ -161,7 +162,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "`/monitor remove_filter username name` — フィルターリストからプロセス名を削除します\n"
             "`/monitor show_pid_list device [hide_system]` — 登録した認証情報でログインし、自分の pid / プロセス名 / コマンド一覧を表示します（hide_system は既定で True、False にすると / で始まるコマンドも表示します）\n"
             "`/monitor reminder device pid` — 登録した認証情報で pid を監視し、終了時にこのチャンネルであなたにメンションします\n"
-            "`/monitor language lang` — 表示言語を設定します（繁體中文 / English / 日本語）\n"
+            "`/monitor language lang` — 表示言語を設定します（繁體中文 / English / 日本語 / メイド / アニメ / MyGO!!!!! / メスガキ）\n"
             "`/monitor help` — このヘルプを表示します\n"
             "\n"
             "`show_pid_list` と `reminder` は、事前に `add_user` でそのデバイスのログイン情報を登録しておく必要があります。\n"
@@ -212,7 +213,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "`/monitor remove_filter username name` — 把藏起來的 process name 找出來\n"
             "`/monitor show_pid_list device [hide_system]` — 用主人登記的帳密幫忙查看裝置上的 pid 清單（hide_system 預設為 True，設 False 就會連系統行程也一起顯示）\n"
             "`/monitor reminder device pid` — 幫主人盯著某個 pid，跑完會在這個頻道叫主人喔\n"
-            "`/monitor language lang` — 讓人家換一種語氣跟主人說話（繁體中文／English／日本語／女僕風格／中二動漫風格／MyGO 風格）\n"
+            "`/monitor language lang` — 讓人家換一種語氣跟主人說話（繁體中文 / English / 日本語 / 女僕 / 動漫 / MyGO!!!!! / 雌小鬼）\n"
             "`/monitor help` — 顯示這份小手冊\n"
             "\n"
             "`show_pid_list` 和 `reminder` 都要先用 `add_user` 讓人家記住登入資訊才能用喔！\n"
@@ -247,7 +248,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "reminder.finished": "{mention} 汝所託付之『宿命』已然完結——裝置 `{device}` 的 pid `{pid}`{command_suffix} 已迎來終焉。",
         "language.set": "汝之意志已被聽見。吾將以「{language_name}」之言靈，與汝對話。",
         "pagination.not_yours": "此乃他者之『記錄之書』，非汝所能翻閱。",
-        "pagination.page_footer": "第 {current}／{total} 頁　封印進度",
+        "pagination.page_footer": "第 {current} / {total} 頁　封印進度",
         "pagination.prev_button": "⬅️ 前一頁的記憶",
         "pagination.next_button": "下一頁的真實 ➡️",
         "help.text": (
@@ -262,7 +263,7 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "`/monitor remove_filter username name` — 解除隱匿之術\n"
             "`/monitor show_pid_list device [hide_system]` — 以汝的契約之力窺探裝置深處的 pid / 行程 / 指令真名（hide_system 預設封印系統行程，設為 False 則解放全部真實）\n"
             "`/monitor reminder device pid` — 開啟『千里眼』監視特定 pid，終焉降臨時必在此頻道昭告於汝\n"
-            "`/monitor language lang` — 切換吾與汝對話所使用的言靈（繁體中文／English／日本語／女僕風格／中二動漫風格／MyGO 風格）\n"
+            "`/monitor language lang` — 切換吾與汝對話所使用的言靈（繁體中文 / English / 日本語 / 女僕 / 動漫 / MyGO!!!!! / 雌小鬼）\n"
             "`/monitor help` — 顯示此禁書目錄\n"
             "\n"
             "`show_pid_list` 與 `reminder` 皆須先以 `add_user` 締結契約，方能發動。\n"
@@ -312,11 +313,61 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "`/monitor remove_filter username name` — 把藏起來的 process name 找回來\n"
             "`/monitor show_pid_list device [hide_system]` — 用妳登記的帳密登入，看看屬於妳自己的 pid 清單（hide_system 預設為 True，設 False 連系統行程也會顯示）\n"
             "`/monitor reminder device pid` — 盯著某個 pid，結束的時候會在這個頻道叫妳\n"
-            "`/monitor language lang` — 換一種語氣說話（繁體中文／English／日本語／女僕風格／中二動漫風格／MyGO 風格）\n"
+            "`/monitor language lang` — 換一種語氣說話（繁體中文 / English / 日本語 / 女僕 / 動漫 / MyGO / 雌小鬼）\n"
             "`/monitor help` — 顯示這份說明\n"
             "\n"
             "`show_pid_list` 和 `reminder` 都要先用 `add_user` 登記過才能用。\n"
             "除了 reminder 結束的通知會在頻道裡公開，其他的——都只有妳看得到。"
+        ),
+    },
+    "mesugaki": {
+        "error.unexpected": "呃……才、才不是我的問題呢！是系統自己出錯的：{error}　哼！",
+        "error.no_device": "嘿嘿，裝置 `{device}` 根本不存在唷，雜魚是不是連名字都打錯了呀？",
+        "error.not_registered": "你連在裝置 `{device}` 上登記都還沒做呢，真是個沒用的雜魚。快用 `/monitor add_user device:{device} ...` 登記啦！",
+        "add_user.registered": "哼，裝置 `{device}` 的帳號 `{username}` 我記住了。這種小事對我來說一下就搞定啦，雜魚應該要感謝我才對吧？",
+        "add_user.updated": "裝置 `{device}` 的帳號 `{username}` 更新好了唷～看吧，果然沒我不行呢。",
+        "remove_user.removed": "裝置 `{device}` 的登入資訊被我刪掉囉，嘿嘿，滿意了嗎，雜魚？",
+        "remove_user.not_found": "你根本沒在裝置 `{device}` 上登記過吧？連這種事都會搞錯，真是個雜魚呢。",
+        "show_user_list.title": "你登記過的裝置（要不是我記性好，你早就忘光了吧）",
+        "add_device.added": "裝置 `{name}` ({ip}:{port}) 加進來囉。哼，這種程度當然難不倒我啦～",
+        "add_device.exists": "裝置 `{name}` 早就有了啦，雜魚是不是忘記了呀？",
+        "remove_device.removed": "裝置 `{name}` 被我刪掉了，嘿嘿，很快吧？雜魚應該跟不上我的速度呢。",
+        "remove_device.not_found": "找不到裝置 `{name}` 耶……才、才不是我沒找到啦！是根本就不存在！",
+        "show_device_list.title": "裝置清單（乖乖看好，別漏看囉）",
+        "add_filter.added": "`{name}` 已經從使用者 `{username}` 的畫面裡藏起來了，嘿嘿，我的手腳很快的唷～",
+        "add_filter.exists": "`{name}` 早就被藏起來了啦，雜魚是不是忘記自己做過了？",
+        "remove_filter.removed": "`{name}` 已經從 `{username}` 的隱藏清單裡拿出來了，滿意了嗎？",
+        "remove_filter.not_found": "`{username}` 的隱藏清單裡根本沒有 `{name}` 這種東西啦，雜魚是不是記錯了？",
+        "show_pid_list.fetch_failed": "呃……才、才不是我的錯呢！是裝置 `{device}` 自己連不上的：{error}",
+        "show_pid_list.empty": "裝置 `{device}` 上沒有任何屬於 `{username}` 的行程唷，很乾淨吧？畢竟是我在看嘛～",
+        "reminder.already_monitoring": "裝置 `{device}` 的 pid `{pid}`，我早就在看著了啦。雜魚是不是忘記自己說過了？",
+        "reminder.connect_failed": "連不上裝置 `{device}` 啦：{error}　才、才不是我的問題呢，哼！",
+        "reminder.pid_not_found": "裝置 `{device}` 上找不到還在跑的 pid `{pid}` 耶，雜魚是不是記錯 pid 了呀？",
+        "reminder.started": "哼，好啦，我就大發慈悲幫你盯著裝置 `{device}` 的 pid `{pid}`{command_suffix} 吧。結束了會告訴你，雜魚要好好感謝我唷～",
+        "reminder.watch_error": "盯著裝置 `{device}` 的 pid `{pid}`{command_suffix} 的時候出錯了……才、才不是我沒看好啦！只好先停下來：{error}",
+        "reminder.finished": "{mention} 喂，雜魚，裝置 `{device}` 的 pid `{pid}`{command_suffix} 跑完了唷，還不快說謝謝？",
+        "language.set": "哼，知道了啦，之後就用「{language_name}」跟你這個雜魚說話吧～",
+        "pagination.not_yours": "這才不是你的分頁訊息呢，雜魚。",
+        "pagination.page_footer": "第 {current}/{total} 頁（乖乖往下看唷）",
+        "pagination.prev_button": "⬅️ 上一頁啦",
+        "pagination.next_button": "下一頁啦 ➡️",
+        "help.text": (
+            "**/monitor 指令一覽（雜魚沒看過的話，先給我乖乖看好）**\n"
+            "`/monitor add_user device username password` — 讓我記住你這個雜魚在該裝置上的 SSH 帳密（每個人、每台裝置都分開記，別搞混囉）\n"
+            "`/monitor remove_user device` — 叫我忘記你在該裝置上的登入資訊\n"
+            "`/monitor show_user_list` — 看看我幫你記住了哪些裝置（密碼才不會說出來呢，哼）\n"
+            "`/monitor add_device name ip port` — 把新裝置加進清單\n"
+            "`/monitor remove_device name` — 把裝置從清單裡刪掉\n"
+            "`/monitor show_device_list` — 看看目前的裝置清單\n"
+            "`/monitor add_filter username name` — 把某個 process name 藏起來，眼不見為淨\n"
+            "`/monitor remove_filter username name` — 把藏起來的 process name 找出來\n"
+            "`/monitor show_pid_list device [hide_system]` — 用你登記的帳密幫你查看裝置上的 pid 清單（hide_system 預設為 True，設 False 就會連系統行程也顯示，雜魚別亂設唷）\n"
+            "`/monitor reminder device pid` — 大發慈悲幫你盯著某個 pid，跑完了會在這個頻道叫你\n"
+            "`/monitor language lang` — 換一種語氣跟你這個雜魚說話（繁體中文 / English / 日本語 / 女僕 / 動漫 / MyGO!!!!! / 雌小鬼）\n"
+            "`/monitor help` — 顯示這份說明（雜魚才需要看第二次啦）\n"
+            "\n"
+            "`show_pid_list` 和 `reminder` 都要先用 `add_user` 登記過才能用唷，這都不知道嗎，雜魚？\n"
+            "除了 reminder 跑完的通知會在頻道裡大聲說出來，其他的都只有你看得到啦……才、才不是我想偷偷跟你說的呢！"
         ),
     },
 }

@@ -8,11 +8,47 @@ from discord.ext import commands
 import config
 from utils import ssh_utils, storage
 from utils.i18n import LANGUAGE_NAMES, t
+from utils.mygo_images import MYGO_IMAGES
 from utils.pagination import paginate, send_paginated
 
 LANGUAGE_CHOICES = [
     app_commands.Choice(name=name, value=code) for code, name in LANGUAGE_NAMES.items()
 ]
+
+
+def _mygo_embed(lang: str, key: str) -> discord.Embed | None:
+    """Attaches a matching MyGO!!!!! meme image when replying in mygo-style."""
+    if lang != "mygo":
+        return None
+    image = MYGO_IMAGES.get(key)
+    if image is None:
+        return None
+    url, alt = image
+    embed = discord.Embed()
+    embed.set_image(url=url)
+    embed.set_footer(text=alt)
+    return embed
+
+
+async def reply(interaction: discord.Interaction, lang: str, key: str, *, use_followup: bool = False, **kwargs) -> None:
+    text = t(lang, key, **kwargs)
+    send_kwargs = {"ephemeral": True}
+    embed = _mygo_embed(lang, key)
+    if embed is not None:
+        send_kwargs["embed"] = embed
+    if use_followup:
+        await interaction.followup.send(text, **send_kwargs)
+    else:
+        await interaction.response.send_message(text, **send_kwargs)
+
+
+async def send_to_channel(channel: discord.abc.Messageable, lang: str, key: str, **kwargs) -> None:
+    text = t(lang, key, **kwargs)
+    embed = _mygo_embed(lang, key)
+    if embed is not None:
+        await channel.send(text, embed=embed)
+    else:
+        await channel.send(text)
 
 
 class MonitorCog(commands.GroupCog, group_name="monitor"):
@@ -33,11 +69,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         # "thinking..." forever instead of ever resolving.
         traceback.print_exception(type(error), error, error.__traceback__)
         lang = await storage.get_user_language(str(interaction.user.id))
-        message = t(lang, "error.unexpected", error=error)
-        if interaction.response.is_done():
-            await interaction.followup.send(message, ephemeral=True)
-        else:
-            await interaction.response.send_message(message, ephemeral=True)
+        await reply(interaction, lang, "error.unexpected", use_followup=interaction.response.is_done(), error=error)
 
     @app_commands.command(name="help", description="顯示 /monitor 指令說明")
     async def help_(self, interaction: discord.Interaction):
@@ -49,9 +81,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
     @app_commands.choices(lang=LANGUAGE_CHOICES)
     async def language(self, interaction: discord.Interaction, lang: app_commands.Choice[str]):
         await storage.set_user_language(str(interaction.user.id), lang.value)
-        await interaction.response.send_message(
-            t(lang.value, "language.set", language_name=lang.name), ephemeral=True
-        )
+        await reply(interaction, lang.value, "language.set", language_name=lang.name)
 
     # ---- user list: per-(Discord user, device) SSH login ----
 
@@ -61,12 +91,12 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         lang = await storage.get_user_language(str(interaction.user.id))
         device_data = await storage.get_device(device)
         if device_data is None:
-            await interaction.response.send_message(t(lang, "error.no_device", device=device), ephemeral=True)
+            await reply(interaction, lang, "error.no_device", device=device)
             return
 
         is_new = await storage.set_user_credential(str(interaction.user.id), device, username, password)
         key = "add_user.registered" if is_new else "add_user.updated"
-        await interaction.response.send_message(t(lang, key, device=device, username=username), ephemeral=True)
+        await reply(interaction, lang, key, device=device, username=username)
 
     @app_commands.command(name="remove_user", description="移除你在該裝置上註冊的登入資訊")
     @app_commands.describe(device="裝置名稱")
@@ -74,7 +104,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         lang = await storage.get_user_language(str(interaction.user.id))
         removed = await storage.remove_user_credential(str(interaction.user.id), device)
         key = "remove_user.removed" if removed else "remove_user.not_found"
-        await interaction.response.send_message(t(lang, key, device=device), ephemeral=True)
+        await reply(interaction, lang, key, device=device)
 
     @app_commands.command(name="show_user_list", description="顯示你自己註冊過的裝置與使用者名稱")
     async def show_user_list(self, interaction: discord.Interaction):
@@ -93,9 +123,9 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         device = {"name": name, "ip": ip, "port": port}
         added = await storage.add_device(device)
         if added:
-            await interaction.response.send_message(t(lang, "add_device.added", name=name, ip=ip, port=port), ephemeral=True)
+            await reply(interaction, lang, "add_device.added", name=name, ip=ip, port=port)
         else:
-            await interaction.response.send_message(t(lang, "add_device.exists", name=name), ephemeral=True)
+            await reply(interaction, lang, "add_device.exists", name=name)
 
     @app_commands.command(name="remove_device", description="從 device list 移除裝置")
     @app_commands.describe(name="裝置名稱")
@@ -103,7 +133,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         lang = await storage.get_user_language(str(interaction.user.id))
         removed = await storage.remove_device(name)
         key = "remove_device.removed" if removed else "remove_device.not_found"
-        await interaction.response.send_message(t(lang, key, name=name), ephemeral=True)
+        await reply(interaction, lang, key, name=name)
 
     @app_commands.command(name="show_device_list", description="顯示目前的 device list")
     async def show_device_list(self, interaction: discord.Interaction):
@@ -121,7 +151,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         lang = await storage.get_user_language(str(interaction.user.id))
         added = await storage.add_filter(username, name)
         key = "add_filter.added" if added else "add_filter.exists"
-        await interaction.response.send_message(t(lang, key, username=username, name=name), ephemeral=True)
+        await reply(interaction, lang, key, username=username, name=name)
 
     @app_commands.command(name="remove_filter", description="從使用者的 filter list 移除 process name")
     @app_commands.describe(username="process 擁有者的使用者名稱", name="要移除的 process name")
@@ -129,7 +159,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         lang = await storage.get_user_language(str(interaction.user.id))
         removed = await storage.remove_filter(username, name)
         key = "remove_filter.removed" if removed else "remove_filter.not_found"
-        await interaction.response.send_message(t(lang, key, username=username, name=name), ephemeral=True)
+        await reply(interaction, lang, key, username=username, name=name)
 
     # ---- pid list ----
 
@@ -139,12 +169,12 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         lang = await storage.get_user_language(str(interaction.user.id))
         device_data = await storage.get_device(device)
         if device_data is None:
-            await interaction.response.send_message(t(lang, "error.no_device", device=device), ephemeral=True)
+            await reply(interaction, lang, "error.no_device", device=device)
             return
 
         credential = await storage.get_user_credential(str(interaction.user.id), device)
         if credential is None:
-            await interaction.response.send_message(t(lang, "error.not_registered", device=device), ephemeral=True)
+            await reply(interaction, lang, "error.not_registered", device=device)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -153,7 +183,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         try:
             processes = await ssh_utils.get_process_list(device_data, username, credential["password"])
         except ssh_utils.SSHCommandError as e:
-            await interaction.followup.send(t(lang, "show_pid_list.fetch_failed", device=device, error=e), ephemeral=True)
+            await reply(interaction, lang, "show_pid_list.fetch_failed", use_followup=True, device=device, error=e)
             return
 
         filters = await storage.load_filters()
@@ -166,7 +196,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         ]
 
         if not processes:
-            await interaction.followup.send(t(lang, "show_pid_list.empty", device=device, username=username), ephemeral=True)
+            await reply(interaction, lang, "show_pid_list.empty", use_followup=True, device=device, username=username)
             return
 
         header = f"{'PID':>8}  {'OWNER':<15}  {'NAME':<20}  COMMAND"
@@ -185,17 +215,17 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         lang = await storage.get_user_language(str(interaction.user.id))
         device_data = await storage.get_device(device)
         if device_data is None:
-            await interaction.response.send_message(t(lang, "error.no_device", device=device), ephemeral=True)
+            await reply(interaction, lang, "error.no_device", device=device)
             return
 
         credential = await storage.get_user_credential(str(interaction.user.id), device)
         if credential is None:
-            await interaction.response.send_message(t(lang, "error.not_registered", device=device), ephemeral=True)
+            await reply(interaction, lang, "error.not_registered", device=device)
             return
 
         key = (device, pid)
         if key in self.active_reminders:
-            await interaction.response.send_message(t(lang, "reminder.already_monitoring", device=device, pid=pid), ephemeral=True)
+            await reply(interaction, lang, "reminder.already_monitoring", device=device, pid=pid)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -205,11 +235,11 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         try:
             alive = await ssh_utils.is_pid_alive(device_data, username, password, pid)
         except ssh_utils.SSHCommandError as e:
-            await interaction.followup.send(t(lang, "reminder.connect_failed", device=device, error=e), ephemeral=True)
+            await reply(interaction, lang, "reminder.connect_failed", use_followup=True, device=device, error=e)
             return
 
         if not alive:
-            await interaction.followup.send(t(lang, "reminder.pid_not_found", device=device, pid=pid), ephemeral=True)
+            await reply(interaction, lang, "reminder.pid_not_found", use_followup=True, device=device, pid=pid)
             return
 
         try:
@@ -218,8 +248,9 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
             command = ""
         command_suffix = f"（`{command}`）" if command else ""
 
-        await interaction.followup.send(
-            t(lang, "reminder.started", device=device, pid=pid, command_suffix=command_suffix), ephemeral=True
+        await reply(
+            interaction, lang, "reminder.started", use_followup=True,
+            device=device, pid=pid, command_suffix=command_suffix,
         )
         task = self.bot.loop.create_task(
             self._watch_pid(
@@ -249,16 +280,15 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
                 try:
                     alive = await ssh_utils.is_pid_alive(device_data, username, password, pid)
                 except ssh_utils.SSHCommandError as e:
-                    await channel.send(
-                        t(lang, "reminder.watch_error", device=device_name, pid=pid, command_suffix=command_suffix, error=e)
+                    await send_to_channel(
+                        channel, lang, "reminder.watch_error",
+                        device=device_name, pid=pid, command_suffix=command_suffix, error=e,
                     )
                     return
                 if not alive:
-                    await channel.send(
-                        t(
-                            lang, "reminder.finished", mention=author.mention,
-                            device=device_name, pid=pid, command_suffix=command_suffix,
-                        )
+                    await send_to_channel(
+                        channel, lang, "reminder.finished", mention=author.mention,
+                        device=device_name, pid=pid, command_suffix=command_suffix,
                     )
                     return
         except asyncio.CancelledError:

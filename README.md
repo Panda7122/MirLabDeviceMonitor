@@ -48,7 +48,11 @@ separate, Discord-client-locale-based mechanism.
 Besides the 3 real languages, `/monitor language` also has 3 easter-egg
 voices that reword every message in-character: 女僕風格 (maid), 中二動漫風
 (chuunibyou anime), and MyGO!!!!! 風格 (deadpan band-drama meme lines). Same
-functionality, different flavor text.
+functionality, different flavor text. In `mygo` mode, error/confirmation/
+reminder messages also attach a matching MyGO!!!!! meme image — curated by
+hand in `utils/mygo_images.py` from real images on
+[mygo.miyago9267.com](https://mygo.miyago9267.com/api/v1/images) (not fetched
+live at runtime, so there's no external API dependency while the bot runs).
 
 ## Setup
 
