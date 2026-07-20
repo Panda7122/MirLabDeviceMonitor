@@ -17,6 +17,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 DEVICES_FILE = os.path.join(DATA_DIR, "devices.json")
 FILTERS_FILE = os.path.join(DATA_DIR, "filters.json")
+LANGUAGES_FILE = os.path.join(DATA_DIR, "languages.json")
 
 PID_POLL_INTERVAL_SECONDS = int(os.getenv("PID_POLL_INTERVAL_SECONDS", "5"))
 # Per-operation timeout (TCP connect, SSH banner/auth, and gaps between reads on an open channel).

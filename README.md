@@ -29,6 +29,7 @@ their own stuff.
 | `/monitor remove_filter <username> <name>` | Un-hide a previously filtered process name |
 | `/monitor show_pid_list <device> [hide_system]` | Log in with your registered credentials and list your pid / process name / command on that device |
 | `/monitor reminder <device> <pid>` | Log in with your registered credentials and get pinged in this channel when that pid finishes |
+| `/monitor language <lang>` | Set your own display language: Traditional Chinese, English, or Japanese |
 | `/monitor help` | Show this command list in Discord |
 
 `show_pid_list` and `reminder` both require you to have run `add_user` for
@@ -37,6 +38,17 @@ registered username, minus anything in that username's filter list, and
 (unless `hide_system:False`) minus processes whose command starts with `/`
 (system daemons — leaves user-run commands like `python3 train.py`). Long
 results are paginated with ⬅️/➡️ buttons.
+
+Every reply is localized to whatever language you last set with
+`/monitor language` (defaults to Traditional Chinese for anyone who hasn't
+set one). This only affects the bot's reply text — not the slash command
+names/descriptions shown in Discord's own command picker, which is a
+separate, Discord-client-locale-based mechanism.
+
+Besides the 3 real languages, `/monitor language` also has 3 easter-egg
+voices that reword every message in-character: 女僕風格 (maid), 中二動漫風
+(chuunibyou anime), and MyGO!!!!! 風格 (deadpan band-drama meme lines). Same
+functionality, different flavor text.
 
 ## Setup
 
@@ -84,6 +96,7 @@ and gitignored:
 - `data/users.json` — `dict[discord_user_id, dict[device_name, {"username", "password"}]]`
 - `data/devices.json` — `list[{"name", "ip", "port"}]`
 - `data/filters.json` — `dict[username, list[process_name]]`
+- `data/languages.json` — `dict[discord_user_id, "chinese" | "english" | "japanese"]`
 
 ## Project layout
 
@@ -91,8 +104,9 @@ and gitignored:
 bot.py                 # entrypoint; syncs the slash command tree on startup
 config.py              # reads .env
 cogs/monitor.py         # all /monitor slash commands
-utils/storage.py        # JSON read/write for users/devices/filters
+utils/storage.py        # JSON read/write for users/devices/filters/languages
 utils/ssh_utils.py       # paramiko: run remote commands, list processes, check if a pid is alive
 utils/pagination.py      # ephemeral pagination (Prev/Next button view)
-data/                   # users.json, devices.json, filters.json
+utils/i18n.py            # translation strings + t(lang, key, **kwargs) for chinese/english/japanese
+data/                   # users.json, devices.json, filters.json, languages.json
 ```

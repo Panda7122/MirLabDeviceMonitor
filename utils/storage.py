@@ -3,10 +3,12 @@ import json
 import os
 
 import config
+from utils.i18n import DEFAULT_LANGUAGE
 
 _users_lock = asyncio.Lock()
 _devices_lock = asyncio.Lock()
 _filters_lock = asyncio.Lock()
+_languages_lock = asyncio.Lock()
 
 
 def _read_json(path: str, default):
@@ -150,3 +152,19 @@ async def remove_filter(username: str, name: str) -> bool:
             filters.pop(username, None)
         _write_json(config.FILTERS_FILE, filters)
         return True
+
+
+# ---- languages.json: dict[dc_id, lang_code] ----
+# per-Discord-user preferred display language for the bot's reply text
+
+async def get_user_language(dc_id: str) -> str:
+    async with _languages_lock:
+        languages = _read_json(config.LANGUAGES_FILE, {})
+        return languages.get(dc_id, DEFAULT_LANGUAGE)
+
+
+async def set_user_language(dc_id: str, lang: str) -> None:
+    async with _languages_lock:
+        languages = _read_json(config.LANGUAGES_FILE, {})
+        languages[dc_id] = lang
+        _write_json(config.LANGUAGES_FILE, languages)

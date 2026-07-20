@@ -7,25 +7,12 @@ from discord.ext import commands
 
 import config
 from utils import ssh_utils, storage
+from utils.i18n import LANGUAGE_NAMES, t
 from utils.pagination import paginate, send_paginated
 
-HELP_TEXT = (
-    "**/monitor 指令列表**\n"
-    "`/monitor add_user device username password` — 註冊你在該裝置上的 SSH 登入資訊（每個 Discord 帳號、每台裝置各自獨立）\n"
-    "`/monitor remove_user device` — 移除你在該裝置上註冊的登入資訊\n"
-    "`/monitor show_user_list` — 顯示你自己註冊過的裝置與使用者名稱（不會顯示密碼）\n"
-    "`/monitor add_device name ip port` — 新增裝置到 device list\n"
-    "`/monitor remove_device name` — 從 device list 移除裝置\n"
-    "`/monitor show_device_list` — 顯示目前的 device list\n"
-    "`/monitor add_filter username name` — 將 process name 加入該使用者的 filter list（顯示 pid 清單時會被隱藏）\n"
-    "`/monitor remove_filter username name` — 從該使用者的 filter list 移除 process name\n"
-    "`/monitor show_pid_list device [hide_system]` — 使用你在該裝置註冊的帳密登入，顯示你自己的 pid / process name / command 清單（hide_system 預設為 True，可設 False 顯示 COMMAND 開頭為 / 的系統行程）\n"
-    "`/monitor reminder device pid` — 使用你在該裝置註冊的帳密監控 pid，執行完畢時在本頻道 mention 你\n"
-    "`/monitor help` — 顯示這份說明\n"
-    "\n"
-    "`show_pid_list` 和 `reminder` 都需要先用 `add_user` 註冊該裝置的登入資訊。\n"
-    "除了 reminder 完成時的通知會公開顯示在頻道，其餘指令的結果都只有你自己看得到。"
-)
+LANGUAGE_CHOICES = [
+    app_commands.Choice(name=name, value=code) for code, name in LANGUAGE_NAMES.items()
+]
 
 
 class MonitorCog(commands.GroupCog, group_name="monitor"):
@@ -45,7 +32,8 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         # command (e.g. after `defer()`) leaves the interaction stuck showing
         # "thinking..." forever instead of ever resolving.
         traceback.print_exception(type(error), error, error.__traceback__)
-        message = f"執行指令時發生未預期的錯誤：{error}"
+        lang = await storage.get_user_language(str(interaction.user.id))
+        message = t(lang, "error.unexpected", error=error)
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
         else:
@@ -53,104 +41,110 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
 
     @app_commands.command(name="help", description="顯示 /monitor 指令說明")
     async def help_(self, interaction: discord.Interaction):
-        await interaction.response.send_message(HELP_TEXT, ephemeral=True)
+        lang = await storage.get_user_language(str(interaction.user.id))
+        await interaction.response.send_message(t(lang, "help.text"), ephemeral=True)
+
+    @app_commands.command(name="language", description="設定你的顯示語言 / Set your display language / 表示言語を設定")
+    @app_commands.describe(lang="顯示語言 / Display language / 表示言語")
+    @app_commands.choices(lang=LANGUAGE_CHOICES)
+    async def language(self, interaction: discord.Interaction, lang: app_commands.Choice[str]):
+        await storage.set_user_language(str(interaction.user.id), lang.value)
+        await interaction.response.send_message(
+            t(lang.value, "language.set", language_name=lang.name), ephemeral=True
+        )
 
     # ---- user list: per-(Discord user, device) SSH login ----
 
     @app_commands.command(name="add_user", description="註冊你在該裝置上的 SSH 登入資訊")
     @app_commands.describe(device="裝置名稱", username="該裝置上的 SSH 使用者名稱", password="該裝置上的 SSH 密碼")
     async def add_user(self, interaction: discord.Interaction, device: str, username: str, password: str):
+        lang = await storage.get_user_language(str(interaction.user.id))
         device_data = await storage.get_device(device)
         if device_data is None:
-            await interaction.response.send_message(f"找不到裝置 `{device}`，請確認裝置名稱是否正確。", ephemeral=True)
+            await interaction.response.send_message(t(lang, "error.no_device", device=device), ephemeral=True)
             return
 
         is_new = await storage.set_user_credential(str(interaction.user.id), device, username, password)
-        if is_new:
-            await interaction.response.send_message(f"已註冊你在裝置 `{device}` 上的登入資訊（使用者：`{username}`）。", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"已更新你在裝置 `{device}` 上的登入資訊（使用者：`{username}`）。", ephemeral=True)
+        key = "add_user.registered" if is_new else "add_user.updated"
+        await interaction.response.send_message(t(lang, key, device=device, username=username), ephemeral=True)
 
     @app_commands.command(name="remove_user", description="移除你在該裝置上註冊的登入資訊")
     @app_commands.describe(device="裝置名稱")
     async def remove_user(self, interaction: discord.Interaction, device: str):
+        lang = await storage.get_user_language(str(interaction.user.id))
         removed = await storage.remove_user_credential(str(interaction.user.id), device)
-        if removed:
-            await interaction.response.send_message(f"已移除你在裝置 `{device}` 上註冊的登入資訊。", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"你尚未在裝置 `{device}` 上註冊登入資訊。", ephemeral=True)
+        key = "remove_user.removed" if removed else "remove_user.not_found"
+        await interaction.response.send_message(t(lang, key, device=device), ephemeral=True)
 
     @app_commands.command(name="show_user_list", description="顯示你自己註冊過的裝置與使用者名稱")
     async def show_user_list(self, interaction: discord.Interaction):
+        lang = await storage.get_user_language(str(interaction.user.id))
         credentials = await storage.list_user_credentials(str(interaction.user.id))
         rows = [f"- {device}: {cred['username']}" for device, cred in credentials.items()]
-        pages = paginate("Your registered logins", rows)
-        await send_paginated(interaction, pages, use_followup=False)
+        pages = paginate(t(lang, "show_user_list.title"), rows, lang)
+        await send_paginated(interaction, pages, lang, use_followup=False)
 
     # ---- device list ----
 
     @app_commands.command(name="add_device", description="新增裝置到 device list")
     @app_commands.describe(name="裝置名稱", ip="裝置 IP", port="SSH port")
     async def add_device(self, interaction: discord.Interaction, name: str, ip: str, port: int):
+        lang = await storage.get_user_language(str(interaction.user.id))
         device = {"name": name, "ip": ip, "port": port}
         added = await storage.add_device(device)
         if added:
-            await interaction.response.send_message(f"已新增裝置 `{name}` ({ip}:{port})。", ephemeral=True)
+            await interaction.response.send_message(t(lang, "add_device.added", name=name, ip=ip, port=port), ephemeral=True)
         else:
-            await interaction.response.send_message(f"裝置 `{name}` 已經存在。", ephemeral=True)
+            await interaction.response.send_message(t(lang, "add_device.exists", name=name), ephemeral=True)
 
     @app_commands.command(name="remove_device", description="從 device list 移除裝置")
     @app_commands.describe(name="裝置名稱")
     async def remove_device(self, interaction: discord.Interaction, name: str):
+        lang = await storage.get_user_language(str(interaction.user.id))
         removed = await storage.remove_device(name)
-        if removed:
-            await interaction.response.send_message(f"已移除裝置 `{name}`。", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"找不到裝置 `{name}`。", ephemeral=True)
+        key = "remove_device.removed" if removed else "remove_device.not_found"
+        await interaction.response.send_message(t(lang, key, name=name), ephemeral=True)
 
     @app_commands.command(name="show_device_list", description="顯示目前的 device list")
     async def show_device_list(self, interaction: discord.Interaction):
+        lang = await storage.get_user_language(str(interaction.user.id))
         devices = await storage.load_devices()
         rows = [f"- {d['name']} ({d['ip']}:{d['port']})" for d in devices]
-        pages = paginate("Device List", rows)
-        await send_paginated(interaction, pages, use_followup=False)
+        pages = paginate(t(lang, "show_device_list.title"), rows, lang)
+        await send_paginated(interaction, pages, lang, use_followup=False)
 
     # ---- filter list ----
 
     @app_commands.command(name="add_filter", description="將 process name 加入使用者的 filter list")
     @app_commands.describe(username="process 擁有者的使用者名稱", name="要隱藏的 process name")
     async def add_filter(self, interaction: discord.Interaction, username: str, name: str):
+        lang = await storage.get_user_language(str(interaction.user.id))
         added = await storage.add_filter(username, name)
-        if added:
-            await interaction.response.send_message(f"已將 `{name}` 加入使用者 `{username}` 的 filter list。", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"`{name}` 已經在使用者 `{username}` 的 filter list 中。", ephemeral=True)
+        key = "add_filter.added" if added else "add_filter.exists"
+        await interaction.response.send_message(t(lang, key, username=username, name=name), ephemeral=True)
 
     @app_commands.command(name="remove_filter", description="從使用者的 filter list 移除 process name")
     @app_commands.describe(username="process 擁有者的使用者名稱", name="要移除的 process name")
     async def remove_filter(self, interaction: discord.Interaction, username: str, name: str):
+        lang = await storage.get_user_language(str(interaction.user.id))
         removed = await storage.remove_filter(username, name)
-        if removed:
-            await interaction.response.send_message(f"已將 `{name}` 從使用者 `{username}` 的 filter list 移除。", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"使用者 `{username}` 的 filter list 中找不到 `{name}`。", ephemeral=True)
+        key = "remove_filter.removed" if removed else "remove_filter.not_found"
+        await interaction.response.send_message(t(lang, key, username=username, name=name), ephemeral=True)
 
     # ---- pid list ----
 
     @app_commands.command(name="show_pid_list", description="使用你註冊的帳密登入裝置，顯示你自己的 pid / process name / command 清單")
     @app_commands.describe(device="裝置名稱", hide_system="是否隱藏 COMMAND 開頭為 / 的系統行程（預設：是）")
     async def show_pid_list(self, interaction: discord.Interaction, device: str, hide_system: bool = True):
+        lang = await storage.get_user_language(str(interaction.user.id))
         device_data = await storage.get_device(device)
         if device_data is None:
-            await interaction.response.send_message(f"找不到裝置 `{device}`，請確認裝置名稱是否正確。", ephemeral=True)
+            await interaction.response.send_message(t(lang, "error.no_device", device=device), ephemeral=True)
             return
 
         credential = await storage.get_user_credential(str(interaction.user.id), device)
         if credential is None:
-            await interaction.response.send_message(
-                f"你尚未在裝置 `{device}` 上註冊登入資訊，請先使用 `/monitor add_user device:{device} ...` 註冊。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(t(lang, "error.not_registered", device=device), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -159,7 +153,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         try:
             processes = await ssh_utils.get_process_list(device_data, username, credential["password"])
         except ssh_utils.SSHCommandError as e:
-            await interaction.followup.send(f"取得裝置 `{device}` 的 pid 清單失敗：{e}", ephemeral=True)
+            await interaction.followup.send(t(lang, "show_pid_list.fetch_failed", device=device, error=e), ephemeral=True)
             return
 
         filters = await storage.load_filters()
@@ -172,7 +166,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         ]
 
         if not processes:
-            await interaction.followup.send(f"裝置 `{device}` 上目前沒有屬於 `{username}` 的行程。", ephemeral=True)
+            await interaction.followup.send(t(lang, "show_pid_list.empty", device=device, username=username), ephemeral=True)
             return
 
         header = f"{'PID':>8}  {'OWNER':<15}  {'NAME':<20}  COMMAND"
@@ -180,30 +174,28 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
             f"{p['pid']:>8}  {p['owner']:<15}  {p['name']:<20}  {p['command'] or '-'}"
             for p in processes
         ]
-        pages = paginate(header, rows)
-        await send_paginated(interaction, pages, use_followup=True)
+        pages = paginate(header, rows, lang)
+        await send_paginated(interaction, pages, lang, use_followup=True)
 
     # ---- reminder ----
 
     @app_commands.command(name="reminder", description="使用你註冊的帳密監控裝置上的 pid，執行完畢時在本頻道通知你")
     @app_commands.describe(device="裝置名稱", pid="要監控的 pid")
     async def reminder(self, interaction: discord.Interaction, device: str, pid: int):
+        lang = await storage.get_user_language(str(interaction.user.id))
         device_data = await storage.get_device(device)
         if device_data is None:
-            await interaction.response.send_message(f"找不到裝置 `{device}`，請確認裝置名稱是否正確。", ephemeral=True)
+            await interaction.response.send_message(t(lang, "error.no_device", device=device), ephemeral=True)
             return
 
         credential = await storage.get_user_credential(str(interaction.user.id), device)
         if credential is None:
-            await interaction.response.send_message(
-                f"你尚未在裝置 `{device}` 上註冊登入資訊，請先使用 `/monitor add_user device:{device} ...` 註冊。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(t(lang, "error.not_registered", device=device), ephemeral=True)
             return
 
         key = (device, pid)
         if key in self.active_reminders:
-            await interaction.response.send_message(f"已經在監控裝置 `{device}` 的 pid `{pid}` 了。", ephemeral=True)
+            await interaction.response.send_message(t(lang, "reminder.already_monitoring", device=device, pid=pid), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -213,11 +205,11 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         try:
             alive = await ssh_utils.is_pid_alive(device_data, username, password, pid)
         except ssh_utils.SSHCommandError as e:
-            await interaction.followup.send(f"連線裝置 `{device}` 失敗：{e}", ephemeral=True)
+            await interaction.followup.send(t(lang, "reminder.connect_failed", device=device, error=e), ephemeral=True)
             return
 
         if not alive:
-            await interaction.followup.send(f"裝置 `{device}` 上找不到執行中的 pid `{pid}`。", ephemeral=True)
+            await interaction.followup.send(t(lang, "reminder.pid_not_found", device=device, pid=pid), ephemeral=True)
             return
 
         try:
@@ -227,7 +219,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         command_suffix = f"（`{command}`）" if command else ""
 
         await interaction.followup.send(
-            f"開始監控裝置 `{device}` 的 pid `{pid}`{command_suffix}，執行完畢時會在此頻道通知你。", ephemeral=True
+            t(lang, "reminder.started", device=device, pid=pid, command_suffix=command_suffix), ephemeral=True
         )
         task = self.bot.loop.create_task(
             self._watch_pid(
@@ -250,6 +242,7 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
         key: tuple[str, int],
     ):
         command_suffix = f"（`{command}`）" if command else ""
+        lang = await storage.get_user_language(str(author.id))
         try:
             while True:
                 await asyncio.sleep(config.PID_POLL_INTERVAL_SECONDS)
@@ -257,12 +250,15 @@ class MonitorCog(commands.GroupCog, group_name="monitor"):
                     alive = await ssh_utils.is_pid_alive(device_data, username, password, pid)
                 except ssh_utils.SSHCommandError as e:
                     await channel.send(
-                        f"監控裝置 `{device_name}` 的 pid `{pid}`{command_suffix} 時發生錯誤，已停止監控：{e}"
+                        t(lang, "reminder.watch_error", device=device_name, pid=pid, command_suffix=command_suffix, error=e)
                     )
                     return
                 if not alive:
                     await channel.send(
-                        f"{author.mention} 裝置 `{device_name}` 的 pid `{pid}`{command_suffix} 已執行完畢。"
+                        t(
+                            lang, "reminder.finished", mention=author.mention,
+                            device=device_name, pid=pid, command_suffix=command_suffix,
+                        )
                     )
                     return
         except asyncio.CancelledError:

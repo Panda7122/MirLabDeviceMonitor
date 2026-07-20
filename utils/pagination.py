@@ -1,10 +1,12 @@
 import discord
 
+from utils.i18n import t
 
-def paginate(header: str, rows: list[str], page_size: int = 20, max_len: int = 1800) -> list[str]:
+
+def paginate(header: str, rows: list[str], lang: str, page_size: int = 20, max_len: int = 1800) -> list[str]:
     """Splits rows into ```code block``` pages of at most page_size rows each,
     also respecting Discord's message length limit. Returns fully rendered
-    page strings (including a footer "頁 x/y" when there's more than one page).
+    page strings (including a "page x/y" footer when there's more than one page).
     """
     if not rows:
         return [f"```\n{header}\n```"]
@@ -29,7 +31,7 @@ def paginate(header: str, rows: list[str], page_size: int = 20, max_len: int = 1
         body = "\n".join([header, *rows_chunk])
         page = f"```\n{body}\n```"
         if total > 1:
-            page += f"\n頁 {i}/{total}"
+            page += "\n" + t(lang, "pagination.page_footer", current=i, total=total)
         pages.append(page)
     return pages
 
@@ -42,12 +44,15 @@ class Paginator(discord.ui.View):
     is just defense in depth.
     """
 
-    def __init__(self, pages: list[str], author_id: int, timeout: float = 180):
+    def __init__(self, pages: list[str], author_id: int, lang: str, timeout: float = 180):
         super().__init__(timeout=timeout)
         self.pages = pages
         self.author_id = author_id
+        self.lang = lang
         self.index = 0
         self.message: discord.InteractionMessage | discord.WebhookMessage | None = None
+        self.previous_page.label = t(lang, "pagination.prev_button")
+        self.next_page.label = t(lang, "pagination.next_button")
         self._update_buttons()
 
     def _update_buttons(self) -> None:
@@ -56,17 +61,17 @@ class Paginator(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.author_id:
-            await interaction.response.send_message("這不是你的分頁訊息。", ephemeral=True)
+            await interaction.response.send_message(t(self.lang, "pagination.not_yours"), ephemeral=True)
             return False
         return True
 
-    @discord.ui.button(label="⬅️ 上一頁", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.secondary)
     async def previous_page(self, interaction: discord.Interaction, _button: discord.ui.Button):
         self.index -= 1
         self._update_buttons()
         await interaction.response.edit_message(content=self.pages[self.index], view=self)
 
-    @discord.ui.button(label="下一頁 ➡️", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.secondary)
     async def next_page(self, interaction: discord.Interaction, _button: discord.ui.Button):
         self.index += 1
         self._update_buttons()
@@ -85,11 +90,12 @@ class Paginator(discord.ui.View):
 async def send_paginated(
     interaction: discord.Interaction,
     pages: list[str],
+    lang: str,
     *,
     use_followup: bool,
 ) -> None:
     """Sends the first page ephemerally, attaching Prev/Next buttons if there's more than one page."""
-    view = Paginator(pages, author_id=interaction.user.id) if len(pages) > 1 else None
+    view = Paginator(pages, author_id=interaction.user.id, lang=lang) if len(pages) > 1 else None
     # discord.py's view kwarg defaults to a MISSING sentinel, not None — passing
     # view=None explicitly fails its type check, so it must be omitted entirely
     # when there's nothing to attach.
